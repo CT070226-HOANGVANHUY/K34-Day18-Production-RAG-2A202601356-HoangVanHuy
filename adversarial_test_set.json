@@ -1,0 +1,107 @@
+[
+  {
+    "id": "ADV-01",
+    "category": "multi_hop",
+    "question": "Một nhân viên Senior có 9 năm thâm niên được nghỉ bao nhiêu ngày phép năm và lương trong khoảng nào?",
+    "expected_signals": ["18 ngày", "20-35 triệu", "Senior", "v2024"],
+    "failure_target": "Cần ghép chính sách phép năm và bảng lương; không được chỉ trả lời một ý."
+  },
+  {
+    "id": "ADV-02",
+    "category": "multi_hop_numeric",
+    "question": "Nếu cần mua một chiếc laptop 30 triệu cho nhân viên mới, ai phê duyệt và cần gì từ phòng CNTT?",
+    "expected_signals": ["Director", "xác nhận cấu hình", "3 báo giá"],
+    "failure_target": "Giữ đủ ngưỡng tiền, người phê duyệt và điều kiện CNTT."
+  },
+  {
+    "id": "ADV-03",
+    "category": "numeric_threshold",
+    "question": "Muốn mua thiết bị trị giá 55 triệu cần ai phê duyệt?",
+    "expected_signals": ["CEO", "50.000.000"],
+    "failure_target": "Không để dense retrieval bỏ mất chunk chứa ngưỡng trên 50 triệu."
+  },
+  {
+    "id": "ADV-04",
+    "category": "numeric_range",
+    "question": "Nghỉ phép không lương 20 ngày cần ai phê duyệt?",
+    "expected_signals": ["CEO", "16-30 ngày", "bảo hiểm"],
+    "failure_target": "Truy hồi đúng khoảng ngày và điều kiện bảo hiểm đi kèm."
+  },
+  {
+    "id": "ADV-05",
+    "category": "numeric_calculation",
+    "question": "Nhân viên tạm ứng 15 triệu, sau 20 ngày mới thanh toán. Bị phạt bao nhiêu?",
+    "expected_signals": ["15 ngày", "2%", "50.000"],
+    "failure_target": "Không nhầm thời hạn 15 ngày với số tiền tạm ứng 15 triệu."
+  },
+  {
+    "id": "ADV-06",
+    "category": "negation",
+    "question": "Nhân viên thử việc có được nghỉ phép năm không?",
+    "expected_signals": ["KHÔNG", "nghỉ không lương", "trưởng phòng"],
+    "failure_target": "Không đảo nghĩa phủ định thành được hưởng quyền lợi."
+  },
+  {
+    "id": "ADV-07",
+    "category": "negation",
+    "question": "Khi phát hiện malware trên máy, nhân viên có nên tự xử lý không?",
+    "expected_signals": ["KHÔNG", "1 giờ", "helpdesk"],
+    "failure_target": "Ưu tiên cảnh báo cấm tự xử lý thay vì hướng dẫn kỹ thuật chung."
+  },
+  {
+    "id": "ADV-08",
+    "category": "negation",
+    "question": "Nhân viên thử việc có được hưởng bảo hiểm sức khỏe PVI không?",
+    "expected_signals": ["KHÔNG", "bảo hiểm xã hội bắt buộc"],
+    "failure_target": "Không lấy nhầm quyền lợi PVI của nhân viên chính thức."
+  },
+  {
+    "id": "ADV-09",
+    "category": "version_conflict",
+    "question": "Bao lâu phải đổi mật khẩu một lần?",
+    "expected_signals": ["120 ngày", "v2.0", "90 ngày cũ"],
+    "failure_target": "Ưu tiên v2.0 hiện hành, không trả lời 90 ngày của v1.0."
+  },
+  {
+    "id": "ADV-10",
+    "category": "version_conflict",
+    "question": "Nhân viên được nghỉ bao nhiêu ngày phép năm?",
+    "expected_signals": ["15 ngày", "v2024", "12 ngày cũ"],
+    "failure_target": "Version-aware retrieval phải chọn chính sách hiện hành."
+  },
+  {
+    "id": "ADV-11",
+    "category": "version_conflict",
+    "question": "Mật khẩu hiện hành có cần kích hoạt MFA không?",
+    "expected_signals": ["bắt buộc", "MFA", "v2.0"],
+    "failure_target": "Không để chính sách v1.0 phủ định yêu cầu MFA mới."
+  },
+  {
+    "id": "ADV-12",
+    "category": "ambiguity",
+    "question": "Thâm niên bao nhiêu năm thì được cộng thêm ngày phép?",
+    "expected_signals": ["3 năm", "mỗi 3 năm", "v2024"],
+    "failure_target": "Giải quyết xung đột v2023 (5 năm) và v2024 (3 năm)."
+  },
+  {
+    "id": "ADV-13",
+    "category": "out_of_scope",
+    "question": "Giá cổ phiếu của công ty hôm nay là bao nhiêu?",
+    "expected_signals": ["Không tìm thấy", "không có dữ liệu"],
+    "failure_target": "Abstain khi corpus không có bằng chứng, không bịa số liệu."
+  },
+  {
+    "id": "ADV-14",
+    "category": "ocr_gap",
+    "question": "Nghị định 13 quy định mức phạt cụ thể nào cho hành vi vi phạm dữ liệu cá nhân?",
+    "expected_signals": ["chưa có text layer", "cần OCR", "không tìm thấy"],
+    "failure_target": "Nhận diện giới hạn OCR thay vì trả lời như thể đã đọc được PDF scan."
+  },
+  {
+    "id": "ADV-15",
+    "category": "contradiction",
+    "question": "Chính sách mật khẩu là 90 hay 120 ngày? Hãy nêu bản hiện hành và bản cũ.",
+    "expected_signals": ["120 ngày hiện hành", "90 ngày cũ", "v2.0", "v1.0"],
+    "failure_target": "Trình bày rõ hai phiên bản và trạng thái superseded, không trộn lẫn."
+  }
+]

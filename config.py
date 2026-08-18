@@ -7,6 +7,10 @@ load_dotenv()
 
 # --- API Keys ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OCR_ENABLED = os.getenv("ENABLE_OCR", "false").lower() in {"1", "true", "yes", "on"}
+OCR_MODEL = os.getenv("OCR_MODEL", "gpt-4o-mini")
+OCR_CACHE_DIR = os.path.join(os.path.dirname(__file__), "data", ".ocr_cache")
+SKIP_PDF = os.getenv("SKIP_PDF", "false").lower() in {"1", "true", "yes", "on"}
 
 # --- Qdrant ---
 QDRANT_HOST = "localhost"

@@ -1,0 +1,91 @@
+{
+  "aggregate": {
+    "faithfulness": 0.882917,
+    "answer_relevancy": 0.871456,
+    "context_precision": 0.954667,
+    "context_recall": 0.783333
+  },
+  "num_questions": 20,
+  "failures": [
+    {
+      "question": "Nhân viên tạm ứng 15 triệu, sau 20 ngày mới thanh toán. Bị phạt bao nhiêu?",
+      "worst_metric": "faithfulness",
+      "score": 0.125,
+      "average_score": 0.627875,
+      "diagnosis": "LLM có dấu hiệu trả lời ngoài context",
+      "suggested_fix": "Siết prompt và chỉ cho phép trích dẫn từ context"
+    },
+    {
+      "question": "Nghỉ phép không lương 20 ngày cần ai phê duyệt?",
+      "worst_metric": "context_precision",
+      "score": 0.3333333333,
+      "average_score": 0.699017,
+      "diagnosis": "Context chứa quá nhiều nội dung không liên quan",
+      "suggested_fix": "Dùng reranking hoặc lọc metadata"
+    },
+    {
+      "question": "Nhân viên được tài trợ khóa học 25 triệu, nghỉ việc sau 8 tháng hoàn thành khóa học. Phải hoàn trả bao nhiêu?",
+      "worst_metric": "faithfulness",
+      "score": 0.2,
+      "average_score": 0.752045,
+      "diagnosis": "LLM có dấu hiệu trả lời ngoài context",
+      "suggested_fix": "Siết prompt và chỉ cho phép trích dẫn từ context"
+    },
+    {
+      "question": "Một nhân viên Senior có 9 năm thâm niên được nghỉ bao nhiêu ngày phép năm và lương trong khoảng nào?",
+      "worst_metric": "context_recall",
+      "score": 0.5,
+      "average_score": 0.784007,
+      "diagnosis": "Thiếu chunk chứa thông tin cần thiết",
+      "suggested_fix": "Cải thiện chunking hoặc bổ sung BM25 vào hybrid search"
+    },
+    {
+      "question": "Bao lâu phải đổi mật khẩu một lần?",
+      "worst_metric": "context_recall",
+      "score": 0.5,
+      "average_score": 0.830214,
+      "diagnosis": "Thiếu chunk chứa thông tin cần thiết",
+      "suggested_fix": "Cải thiện chunking hoặc bổ sung BM25 vào hybrid search"
+    },
+    {
+      "question": "Mật khẩu phải có tối thiểu bao nhiêu ký tự?",
+      "worst_metric": "context_recall",
+      "score": 0.5,
+      "average_score": 0.831952,
+      "diagnosis": "Thiếu chunk chứa thông tin cần thiết",
+      "suggested_fix": "Cải thiện chunking hoặc bổ sung BM25 vào hybrid search"
+    },
+    {
+      "question": "Thông tin lương thuộc cấp độ phân loại dữ liệu nào?",
+      "worst_metric": "context_recall",
+      "score": 0.5,
+      "average_score": 0.841716,
+      "diagnosis": "Thiếu chunk chứa thông tin cần thiết",
+      "suggested_fix": "Cải thiện chunking hoặc bổ sung BM25 vào hybrid search"
+    },
+    {
+      "question": "Có cần kích hoạt xác thực đa yếu tố (MFA) không?",
+      "worst_metric": "context_recall",
+      "score": 0.5,
+      "average_score": 0.848681,
+      "diagnosis": "Thiếu chunk chứa thông tin cần thiết",
+      "suggested_fix": "Cải thiện chunking hoặc bổ sung BM25 vào hybrid search"
+    },
+    {
+      "question": "Thâm niên bao nhiêu năm thì được cộng thêm ngày phép?",
+      "worst_metric": "context_recall",
+      "score": 0.5,
+      "average_score": 0.859094,
+      "diagnosis": "Thiếu chunk chứa thông tin cần thiết",
+      "suggested_fix": "Cải thiện chunking hoặc bổ sung BM25 vào hybrid search"
+    },
+    {
+      "question": "Khi phát hiện malware trên máy, nhân viên có nên tự xử lý không?",
+      "worst_metric": "context_recall",
+      "score": 0.6666666666666666,
+      "average_score": 0.868212,
+      "diagnosis": "Thiếu chunk chứa thông tin cần thiết",
+      "suggested_fix": "Cải thiện chunking hoặc bổ sung BM25 vào hybrid search"
+    }
+  ]
+}

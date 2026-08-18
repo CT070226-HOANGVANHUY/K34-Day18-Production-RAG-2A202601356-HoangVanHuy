@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (DATA_DIR, HIERARCHICAL_PARENT_SIZE, HIERARCHICAL_CHILD_SIZE,
-                    SEMANTIC_THRESHOLD)
+                    SEMANTIC_THRESHOLD, OCR_ENABLED, SKIP_PDF)
 
 
 @dataclass
@@ -33,24 +33,46 @@ def _extract_pdf_text(path: str) -> str:
     return "\n\n".join(pages).strip()
 
 
-def load_documents(data_dir: str = DATA_DIR) -> list[dict]:
-    """Load tất cả markdown và PDF (có text layer) từ data/. (Đã implement sẵn)
+def load_documents(data_dir: str = DATA_DIR, enable_ocr: bool | None = None,
+                   skip_pdf: bool | None = None) -> list[dict]:
+    """Load markdown và PDF từ data/.
 
     - .md: đọc trực tiếp.
-    - .pdf: trích text layer bằng pypdf. PDF scan ảnh (không có text) bị bỏ qua
-      kèm cảnh báo — RAG text-based không xử lý được scan nếu chưa OCR.
+    - .pdf: trích text layer bằng pypdf; nếu ``enable_ocr`` bật thì OCR các trang
+      scan bằng Vision API và lưu cache theo từng trang.
+    - Bỏ qua toàn bộ PDF bằng ``skip_pdf=True`` hoặc ``SKIP_PDF=true``.
     """
     docs = []
     for fp in sorted(glob.glob(os.path.join(data_dir, "*.md"))):
         with open(fp, encoding="utf-8") as f:
             docs.append({"text": f.read(), "metadata": {"source": os.path.basename(fp)}})
 
+    if skip_pdf if skip_pdf is not None else SKIP_PDF:
+        pdfs = sorted(glob.glob(os.path.join(data_dir, "*.pdf")))
+        if pdfs:
+            print(f"  [skip] Bo qua {len(pdfs)} file PDF (SKIP_PDF=true).")
+        return docs
+
     for fp in sorted(glob.glob(os.path.join(data_dir, "*.pdf"))):
         text = _extract_pdf_text(fp)
         if text:
             docs.append({"text": text, "metadata": {"source": os.path.basename(fp)}})
+        elif enable_ocr if enable_ocr is not None else OCR_ENABLED:
+            from src.ocr import ocr_pdf
+            try:
+                ocr_text = ocr_pdf(fp)
+            except RuntimeError as exc:
+                print(f"  ⚠️  {exc}")
+                ocr_text = ""
+            if ocr_text:
+                docs.append({
+                    "text": ocr_text,
+                    "metadata": {"source": os.path.basename(fp), "ocr": True},
+                })
+            else:
+                print(f"  ⚠️  OCR không tạo được text cho {os.path.basename(fp)}.")
         else:
-            print(f"  ⚠️  Bỏ qua {os.path.basename(fp)}: PDF scan ảnh, không có text layer (cần OCR).")
+            print(f"  ⚠️  Bỏ qua {os.path.basename(fp)}: PDF scan ảnh, không có text layer (bật ENABLE_OCR=true để OCR).")
 
     return docs
 
@@ -87,20 +109,36 @@ def chunk_semantic(text: str, threshold: float = SEMANTIC_THRESHOLD,
     Split text by sentence similarity — nhóm câu cùng chủ đề.
     Tốt hơn basic vì không cắt giữa ý.
     """
-    # TODO: Implement semantic chunking
-    # 1. from sentence_transformers import SentenceTransformer
-    #    from numpy import dot
-    #    from numpy.linalg import norm
-    # 2. metadata = metadata or {}
-    # 3. Split text thành sentences: re.split(r'(?<=[.!?])\s+|\n\n', text)
-    # 4. model = SentenceTransformer("all-MiniLM-L6-v2")
-    #    embeddings = model.encode(sentences)
-    # 5. cosine_sim(a, b) = dot(a, b) / (norm(a) * norm(b) + 1e-9)
-    # 6. Duyệt từ sentence[1]:
-    #      - sim(embedding[i-1], embedding[i]) < threshold → tách chunk mới
-    #      - else: gộp vào chunk hiện tại
-    # 7. Return [Chunk(text=joined_group, metadata={..., "strategy": "semantic"})]
-    return []
+    metadata = dict(metadata or {})
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n{2,}", text) if s.strip()]
+    if not sentences:
+        return []
+    if len(sentences) == 1:
+        return [Chunk(sentences[0], {**metadata, "strategy": "semantic", "chunk_index": 0})]
+
+    try:
+        from sentence_transformers import SentenceTransformer
+        import numpy as np
+
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        embeddings = model.encode(sentences, normalize_embeddings=True, show_progress_bar=False)
+        similarities = [float(np.dot(embeddings[i - 1], embeddings[i])) for i in range(1, len(sentences))]
+    except Exception as exc:
+        # Chunking remains usable if a model cannot be downloaded in an offline run.
+        print(f"  ⚠️  Semantic model unavailable, using sentence fallback: {exc}")
+        similarities = [1.0] * (len(sentences) - 1)
+
+    groups = [[sentences[0]]]
+    for sentence, similarity in zip(sentences[1:], similarities):
+        if similarity < threshold:
+            groups.append([sentence])
+        else:
+            groups[-1].append(sentence)
+
+    return [
+        Chunk(" ".join(group), {**metadata, "strategy": "semantic", "chunk_index": i})
+        for i, group in enumerate(groups)
+    ]
 
 
 # ─── Strategy 2: Hierarchical Chunking ──────────────────
@@ -116,16 +154,56 @@ def chunk_hierarchical(text: str, parent_size: int = HIERARCHICAL_PARENT_SIZE,
     Returns:
         (parents, children) — mỗi child có parent_id link đến parent.
     """
-    # TODO: Implement hierarchical chunking
-    # 1. metadata = metadata or {}
-    # 2. Split text bằng "\n\n" → paragraphs
-    # 3. Gộp paragraphs thành parent chunks (mỗi parent ≤ parent_size chars):
-    #      pid = f"parent_{len(parents)}"
-    #      parents.append(Chunk(text=..., metadata={..., "chunk_type": "parent", "parent_id": pid}))
-    # 4. Mỗi parent → split thành children (mỗi child ≤ child_size chars):
-    #      children.append(Chunk(text=..., metadata={..., "chunk_type": "child"}, parent_id=pid))
-    # 5. return (parents, children)
-    return ([], [])
+    metadata = dict(metadata or {})
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    if not paragraphs and text.strip():
+        paragraphs = [text.strip()]
+
+    def split_by_size(value: str, size: int) -> list[str]:
+        if len(value) <= size:
+            return [value]
+        words = value.split()
+        pieces, current = [], []
+        current_len = 0
+        for word in words:
+            extra = len(word) + (1 if current else 0)
+            if current and current_len + extra > size:
+                pieces.append(" ".join(current))
+                current, current_len = [], 0
+            current.append(word)
+            current_len += len(word) + (1 if current_len else 0)
+        if current:
+            pieces.append(" ".join(current))
+        return pieces or [value[:size]]
+
+    parent_texts, current, current_len = [], [], 0
+    for paragraph in paragraphs:
+        for piece in split_by_size(paragraph, parent_size):
+            extra = len(piece) + (2 if current else 0)
+            if current and current_len + extra > parent_size:
+                parent_texts.append("\n\n".join(current))
+                current, current_len = [], 0
+            current.append(piece)
+            current_len += len(piece) + (2 if current_len else 0)
+    if current:
+        parent_texts.append("\n\n".join(current))
+
+    parents, children = [], []
+    for parent_index, parent_text in enumerate(parent_texts):
+        parent_id = f"parent_{parent_index}"
+        parents.append(Chunk(
+            parent_text,
+            {**metadata, "chunk_type": "parent", "parent_id": parent_id,
+             "chunk_index": parent_index},
+        ))
+        for child_index, child_text in enumerate(split_by_size(parent_text, child_size)):
+            children.append(Chunk(
+                child_text,
+                {**metadata, "chunk_type": "child", "parent_id": parent_id,
+                 "chunk_index": child_index},
+                parent_id=parent_id,
+            ))
+    return parents, children
 
 
 # ─── Strategy 3: Structure-Aware Chunking ────────────────
@@ -136,14 +214,33 @@ def chunk_structure_aware(text: str, metadata: dict | None = None) -> list[Chunk
     Parse markdown headers → chunk theo logical structure.
     Giữ nguyên tables, code blocks, lists — không cắt giữa chừng.
     """
-    # TODO: Implement structure-aware chunking
-    # 1. metadata = metadata or {}
-    # 2. sections = re.split(r'(^#{1,3}\s+.+$)', text, flags=re.MULTILINE)
-    # 3. Duyệt sections:
-    #      - Nếu match header (^#{1,3}\s+): lưu header hiện tại, tạo chunk cho content trước đó
-    #      - Else: gộp vào content hiện tại
-    # 4. Return [Chunk(text=header+content, metadata={..., "section": header, "strategy": "structure"})]
-    return []
+    metadata = dict(metadata or {})
+    lines = text.splitlines()
+    chunks, current_lines, current_header = [], [], ""
+
+    def flush() -> None:
+        content = "\n".join(current_lines).strip()
+        if not content:
+            return
+        section = current_header.lstrip("#").strip() if current_header else ""
+        chunks.append(Chunk(
+            content,
+            {**metadata, "section": section, "header": current_header,
+             "strategy": "structure", "chunk_index": len(chunks)},
+        ))
+
+    for line in lines:
+        if re.match(r"^#{1,3}\s+.+$", line.strip()):
+            flush()
+            current_lines = [line.strip()]
+            current_header = line.strip()
+        else:
+            current_lines.append(line)
+    flush()
+
+    if not chunks and text.strip():
+        return [Chunk(text.strip(), {**metadata, "section": "", "strategy": "structure", "chunk_index": 0})]
+    return chunks
 
 
 # ─── A/B Test: Compare All Strategies ────────────────────

@@ -41,6 +41,20 @@ cp .env.example .env                    # Điền API keys
 python naive_baseline.py                # ⚠️ Chạy TRƯỚC để có baseline
 ```
 
+### OCR cho PDF scan
+
+Hai PDF scan (`BCTC.pdf` và `Nghi_dinh_so_13-2023...pdf`) không có text layer.
+OCR được tích hợp nhưng tắt mặc định vì tính phí theo trang và lưu cache từng
+trang trong `data/.ocr_cache/`:
+
+```powershell
+$env:ENABLE_OCR="true"
+python -c "from src.m1_chunking import load_documents; print(len(load_documents()))"
+```
+
+OCR dùng vision-capable OpenAI model với ảnh base64; nếu backend OCR lỗi, trang
+đó được bỏ qua có cảnh báo thay vì làm hỏng toàn bộ pipeline.
+
 ## Chạy toàn bộ
 
 ```bash

@@ -11,6 +11,7 @@ from src.m2_search import HybridSearch
 from src.m3_rerank import CrossEncoderReranker
 from src.m4_eval import load_test_set, evaluate_ragas, failure_analysis, save_report
 from src.m5_enrichment import enrich_chunks
+from src.robustness import build_query_plan, prioritize_results, should_abstain
 from config import RERANK_TOP_K
 
 
@@ -59,10 +60,18 @@ def build_pipeline():
 
 def run_query(query: str, search: HybridSearch, reranker: CrossEncoderReranker) -> tuple[str, list[str]]:
     """Run single query through pipeline."""
-    results = search.search(query)
+    plan = build_query_plan(query)
+    retrieval_k = max(RERANK_TOP_K * 4, 12 if plan.is_multi_hop else RERANK_TOP_K * 4)
+    results = search.search(query, top_k=retrieval_k)
     docs = [{"text": r.text, "score": r.score, "metadata": r.metadata} for r in results]
-    reranked = reranker.rerank(query, docs, top_k=RERANK_TOP_K)
-    contexts = [r.text for r in reranked] if reranked else [r.text for r in results[:3]]
+    rerank_k = 6 if plan.is_multi_hop else RERANK_TOP_K
+    reranked = reranker.rerank(query, docs, top_k=rerank_k)
+    candidate_contexts = reranked if reranked else results
+    context_limit = 6 if plan.is_multi_hop else RERANK_TOP_K
+    contexts = [r.text for r in prioritize_results(query, candidate_contexts)[:context_limit]]
+
+    if should_abstain(query, contexts):
+        return "Không tìm thấy thông tin có bằng chứng trong corpus.", contexts
 
     from config import OPENAI_API_KEY
     if OPENAI_API_KEY and contexts:
@@ -71,7 +80,7 @@ def run_query(query: str, search: HybridSearch, reranker: CrossEncoderReranker) 
             client = OpenAI()
             context_str = "\n\n".join(contexts)
             resp = client.chat.completions.create(model="gpt-4o-mini", messages=[
-                {"role": "system", "content": "Trả lời CHỈ dựa trên context. Nếu không có → nói 'Không tìm thấy.'"},
+                {"role": "system", "content": "Trả lời CHỈ dựa trên context. Với câu hỏi nhiều ý, phải tìm đủ bằng chứng cho từng ý. Không được suy diễn hoặc trộn phiên bản cũ; nếu thiếu bằng chứng cho một ý, nói rõ phần đó chưa tìm thấy."},
                 {"role": "user", "content": f"Context:\n{context_str}\n\nCâu hỏi: {query}"},
             ])
             answer = resp.choices[0].message.content
